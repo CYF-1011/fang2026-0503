@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>腦動量表</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        
+        h1, h2, h3 { color: #2c3e50; }
+        input[type="number"], select {
+            width: 80%;
+            padding: 12px;
+            margin: 15px 0;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 18px;
+            text-align: center;
+            background-color: white;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            margin: 10px 5px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 90%;
+            transition: 0.2s;
+        }
+        button:active { transform: scale(0.96); }
+        button.btn-secondary { background-color: #95a5a6; }
+        button.btn-success { background-color: #2ecc71; }
+        button.btn-danger { background-color: #e74c3c; }
+
+        .card {
+            border: 3px dashed #f39c12;
+            padding: 15px;
+            border-radius: 10px;
+            background-color: #fdfae6;
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .card-option {
+            padding: 12px;
+            margin: 8px 0;
+            background: #fff;
+            border: 2px solid #f39c12;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            color: #d35400;
+            transition: 0.2s;
+        }
+        .card-option.selected {
+            background: #f39c12;
+            color: white;
+        }
+
+        .big-number {
+            font-size: 80px;
+            font-weight: bold;
+            color: #e74c3c;
+            margin: 30px 0;
+        }
+
+        .player-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #ecf0f1;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        .player-row.revealed {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .number-correct { color: #2c3e50; font-weight: bold; font-size: 24px; }
+        .number-wrong { color: #c0392b; font-weight: bold; font-size: 24px; text-decoration: underline; }
+
+        .highlight-topic {
+            font-size: 24px;
+            color: #e74c3c;
+            background: #fdfae6;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #e74c3c;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 畫面 1: 輸入人數 -->
+    <div id="screen-setup" class="screen active">
+        <h2>腦動量表 🧠</h2>
+        <p>輸入總人數 (含關主)</p>
+        <p style="font-size: 12px; color: #7f8c8d;">最多 11 人喔</p>
+        <input type="number" id="player-count" min="2" max="11" placeholder="例如: 5">
+        <button onclick="startGame()">下一步：關主抽牌</button>
+    </div>
+
+    <!-- 畫面 2: 關主抽牌 -->
+    <div id="screen-card" class="screen">
+        <h2>關主抽牌</h2>
+        <p>玩家 <span id="master-id"></span> 是關主！</p>
+        <p>請點選你要讓大家演哪一題：</p>
+        <div class="card" id="card-display"></div>
+        <button class="btn-secondary" onclick="drawCard()">題目太爛，重抽</button>
+        <button class="btn-success" onclick="startAssigning()">選好了，開始發數字</button>
+    </div>
+
+    <!-- 畫面 3A: 傳遞手機 -->
+    <div id="screen-pass" class="screen">
+        <h2>發放數字</h2>
+        <p>請將手機交給</p>
+        <h1 style="color: #3498db;">玩家 <span id="current-player-id">1</span></h1>
+        <button onclick="showNumber()">我拿到了，看數字</button>
+    </div>
+
+    <!-- 畫面 3B: 看數字 -->
+    <div id="screen-reveal" class="screen">
+        <h2>你的秘密數字是</h2>
+        <div class="big-number" id="secret-number">?</div>
+        <p>偷偷記好，不要給別人看到！</p>
+        <button class="btn-success" onclick="nextPlayer()">確認，換下一位</button>
+    </div>
+
+    <!-- 畫面 4: 遊戲進行中 -->
+    <div id="screen-action" class="screen">
+        <h2>🎉 遊戲開始！</h2>
+        <p>本局的題目是：</p>
+        <div class="highlight-topic" id="action-topic-display"></div>
+        <p>請大家依照抽到的數字程度，開始你的表演！</p>
+        <p style="font-size: 14px; color: #7f8c8d;">(表演完後把手機還給關主)</p>
+        <button onclick="setupSorting()">關主拿回手機，開始排序</button>
+        <br><br>
+        <button class="btn-danger" style="width: auto; padding: 8px 15px; font-size: 14px;" onclick="openForgotScreen()">🐟 忘記數字了？</button>
+    </div>
+
+    <!-- 畫面 4.1: 防金魚腦 - 選擇玩家 -->
+    <div id="screen-forgot" class="screen">
+        <h2>誰是金魚腦？ 🐟</h2>
+        <p>請選擇你是哪一位玩家：</p>
+        <select id="forgot-player-select"></select>
+        <button onclick="revealForgotNumber()">看我的數字</button>
+        <button class="btn-secondary" onclick="backToAction()">取消，我想起來了</button>
+    </div>
+
+    <!-- 畫面 4.2: 防金魚腦 - 再次顯示數字 -->
+    <div id="screen-forgot-reveal" class="screen">
+        <h2>你的秘密數字是</h2>
+        <div class="big-number" id="forgot-secret-number">?</div>
+        <p>這次要記好啦，快回遊戲！</p>
+        <button class="btn-success" onclick="backToAction()">確認，回到遊戲</button>
+    </div>
+
+    <!-- 畫面 5A: 選擇排序方式 -->
+    <div id="screen-sort-mode" class="screen">
+        <h2>關主來排序</h2>
+        <p>你覺得大家演的程度順序是：</p>
+        <button onclick="startSorting('asc')">由小排到大 (1 ➜ 10)</button>
+        <button onclick="startSorting('desc')">由大排到小 (10 ➜ 1)</button>
+    </div>
+
+    <!-- 畫面 5B: 點擊揭曉數字 -->
+    <div id="screen-sorting" class="screen">
+        <h2>驗收結果</h2>
+        <p id="sort-instruction"></p>
+        <div id="player-buttons-container"></div>
+        <br>
+        <button class="btn-success" onclick="finishRound()">完成本局</button>
+    </div>
+
+    <!-- 畫面 6: 結算 -->
+    <div id="screen-finish" class="screen">
+        <h2>本局結束啦！</h2>
+        <button onclick="returnToSetup()">回第 1 步 (重設人數)</button>
+        <button class="btn-secondary" onclick="returnToCard()">回第 2 步 (原班人馬繼續玩)</button>
+    </div>
+</div>
+
+<script>
+    let totalPlayers = 0;
+    let currentPlayer = 1;
+    let playerNumbers = {}; 
+    let currentSortMode = '';
+    let lastRevealedNumber = null;
+    let selectedTopic = "";
+
+    const cardDatabase = [
+        ["說出一部電影的結局(1是最不意外，10是最暴雷)", "你去探望因為車禍而癱瘓的好友，你說了什麼?(1是最溫馨，10是最地獄)", "說出一個避免外遇曝光的小技巧(1是最常見，10是最天才)", "你參與了一項實驗，要求你必須以今天的一則新聞作為自慰的配菜，你選哪一則呢?(可打開手機搜尋)(1是最困難，10是最好用)"],
+        ["你忘了今天是我生日!從視線所及的東西中，挑一個假裝是要送我的禮物(1是最敷衍，10是最有誠意)", "你可以消滅一個物種，你選擇了什麼?(1是造福人類，10是生態浩劫)", "你最關心什麼公共議題?(1是最憂國憂民，10是最無解)", "你亂入了鄰居的烤肉派對，吃了兩口你才發現他們在烤的其實是什麼?(1是最驚喜，10是最驚嚇)"],
+        ["你獲得暫停時間的超能力!你會用來做什麼?(1是最能幫助大眾，10是最能滿足私慾)", "你發明了一款新調酒，叫什麼名字?(1是聽起來最難喝，10是聽起來最好喝)", "你現在正在夜店，表現你的舞姿吧!(1是最害羞，10是最迷人)", "你最好解釋一下為什麼你的房間裡有一位全裸的10歲小女孩(1是最合理，10是最變態)"],
+        ["全部人同時表演:用你的手模擬精子，遊戲盒是卵子(1是最沒活力，10是最亢奮)", "表演:你在夜店向一位語言不通的外國人約炮，你會怎麼做?(1是最滑稽，10是最性感)", "那個可惡的主管的外遇證據被你掌握了，你會怎麼要脅對方?(1是最常見，10是最變態)", "你無意中翻到妹妹的日記，其中一頁寫了什麼?(1是最稀鬆平常，10是最令人震驚)"],
+		["說出一種做愛的好處(1是最科學，10是最瞎扯)", "說出一個你現在要馬上離開的理由(1是最能接受，10是最被唾棄)", "你很有好感的單身鄰居，某天掉了鑰匙被你撿到，你會做什麼?(1是最普通，10是最變態)", "你在路上看到一個無家老人睡在路邊，你拍照後上傳社群媒體，貼文寫了什麼?(1是最常見，10是最地獄)"],
+		["你是我的刺青師，會建議我刺些什麼？(1是最帥氣，10是最羞恥)", "每人說出一位男性的共同朋友，然後根據外貌排序(1是最低，10是最高)", "搭乘的遊輪沉沒了!你和_____一起流落到無人島(請塡上一位共同朋友) (1是最有利生存，10是最沒生還希望)", "你可以用什麼動物來代替導盲犬?(1是最合理，10是荒謬)"],
+		["你在會議中投影簡報時，不小心打開什麼網站，讓現場一陣沉默?(1是小尷尬，10是令你崩潰)", "班上來了一位一隻腳是義肢的轉學生，每人對他提一個問題(1是最普通，10是最歧視)", "說出一種生小孩的好處(1是最溫馨，10是最不對勁)", "按摩師為你提供了什麼額外服務?(1是最普通，10是最刺激)"],
+		["選擇一隻寶X夢，創造它的全新進化型態，並為其取名(1是最普通，10是最色情)", "你獲得一項什麼超廢的超能力?(1是勉強能用，10是廢到笑)", "說出一種對抗女鬼的方法(1是最常見，10是最不對勁)", "你是到府清潔的打掃人員，這天你服務的客戶一邊在你打掃時一邊做什麼?(1是最常見，10是最不對勁)"],
+		["輪流說出一個自己的缺點(1是最無關痛癢，10是最不可原諒)", "要如何用一句話讓你的父母哭泣?(1是淡淡的哀傷，10是斷絕親子關係)", "當你的割闌尾手術結束後，醫生跟你說他割錯了，他割了什麼?(1是最無關痛癢，10是讓你最崩潰)", "表演:展現你的舌頭靈活度(1是最笨拙，10是最靈活)"],
+        ["你正在導演一部成人電影，第一幕是女主角全裸正在淋浴的鏡頭，接著浴室的門打開，出現了什麼?(1是正常地色色，10是變態地色色)", "你最好解釋一下，為什麼你身上有三級管制藥品(1是最合理，10是最不對勁)", "說出一種伴侶之間暗示今晚要做的暗號(1是最普通，10是最傻眼)", "表演:你是性交易工作者，正在路上試圖勾引路人(1是最消火，10是最撩人)"]
+    ];
+
+    function switchScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+    }
+
+    function startGame() {
+        const input = document.getElementById('player-count').value;
+        totalPlayers = parseInt(input);
+        
+        if (isNaN(totalPlayers) || totalPlayers < 2) {
+            alert('至少要 2 個人才能玩啦！');
+            return;
+        }
+        if (totalPlayers > 11) {
+            alert('最多只能 11 個人玩喔！');
+            return;
+        }
+        
+        document.getElementById('master-id').innerText = totalPlayers;
+        drawCard();
+        switchScreen('screen-card');
+    }
+
+    function drawCard() {
+        selectedTopic = ""; 
+        const randomIndex = Math.floor(Math.random() * cardDatabase.length);
+        const card = cardDatabase[randomIndex];
+        const display = document.getElementById('card-display');
+        
+        display.innerHTML = '';
+        card.forEach((topic, index) => {
+            const opt = document.createElement('div');
+            opt.className = 'card-option';
+            opt.innerText = `${index + 1}. ${topic}`;
+            
+            opt.onclick = function() {
+                document.querySelectorAll('.card-option').forEach(el => el.classList.remove('selected'));
+                opt.classList.add('selected');
+                selectedTopic = topic; 
+            };
+            
+            display.appendChild(opt);
+        });
+    }
+
+    function startAssigning() {
+        if (!selectedTopic) {
+            alert('喂！關主你要先點選一個題目啦！');
+            return;
+        }
+
+        let numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        for (let i = numbers.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
+        }
+
+        playerNumbers = {};
+        for (let i = 1; i < totalPlayers; i++) {
+            playerNumbers[i] = numbers[i - 1];
+        }
+
+        currentPlayer = 1;
+        updatePassScreen();
+        switchScreen('screen-pass');
+    }
+
+    function updatePassScreen() {
+        document.getElementById('current-player-id').innerText = currentPlayer;
+    }
+
+    function showNumber() {
+        document.getElementById('secret-number').innerText = playerNumbers[currentPlayer];
+        switchScreen('screen-reveal');
+    }
+
+    function nextPlayer() {
+        currentPlayer++;
+        if (currentPlayer < totalPlayers) {
+            updatePassScreen();
+            switchScreen('screen-pass');
+        } else {
+            document.getElementById('action-topic-display').innerText = selectedTopic;
+            switchScreen('screen-action');
+        }
+    }
+
+    // --- 新增：防金魚腦機制 ---
+    function openForgotScreen() {
+        const select = document.getElementById('forgot-player-select');
+        select.innerHTML = '';
+        // 將 1 ~ n-1 的玩家塞進下拉選單
+        for (let i = 1; i < totalPlayers; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.text = `玩家 ${i}`;
+            select.appendChild(option);
+        }
+        switchScreen('screen-forgot');
+    }
+
+    function revealForgotNumber() {
+        const playerId = document.getElementById('forgot-player-select').value;
+        document.getElementById('forgot-secret-number').innerText = playerNumbers[playerId];
+        switchScreen('screen-forgot-reveal');
+    }
+
+    function backToAction() {
+        switchScreen('screen-action');
+    }
+    // ------------------------
+
+    function setupSorting() {
+        switchScreen('screen-sort-mode');
+    }
+
+    function startSorting(mode) {
+        currentSortMode = mode;
+        lastRevealedNumber = null;
+        
+        const modeText = mode === 'asc' ? '【由小到大】' : '【由大到小】';
+        document.getElementById('sort-instruction').innerText = `目前挑戰：${modeText}`;
+        
+        const container = document.getElementById('player-buttons-container');
+        container.innerHTML = '';
+
+        for (let i = 1; i < totalPlayers; i++) {
+            const btn = document.createElement('div');
+            btn.className = 'player-row';
+            btn.innerHTML = `<span>玩家 ${i}</span> <span class="reveal-area">點我揭曉</span>`;
+            
+            btn.onclick = function() {
+                if (btn.classList.contains('revealed')) return; 
+                
+                const num = playerNumbers[i];
+                let isCorrect = true;
+
+                if (lastRevealedNumber !== null) {
+                    if (currentSortMode === 'asc' && num < lastRevealedNumber) isCorrect = false;
+                    if (currentSortMode === 'desc' && num > lastRevealedNumber) isCorrect = false;
+                }
+                lastRevealedNumber = num;
+
+                const revealArea = btn.querySelector('.reveal-area');
+                if (isCorrect) {
+                    revealArea.innerHTML = `<span class="number-correct">${num}</span>`;
+                } else {
+                    revealArea.innerHTML = `<span class="number-wrong">${num}</span>`;
+                }
+                
+                btn.classList.add('revealed');
+            };
+            
+            container.appendChild(btn);
+        }
+
+        switchScreen('screen-sorting');
+    }
+
+    function finishRound() {
+        switchScreen('screen-finish');
+    }
+
+    function returnToSetup() {
+        document.getElementById('player-count').value = '';
+        switchScreen('screen-setup');
+    }
+
+    function returnToCard() {
+        drawCard();
+        switchScreen('screen-card');
+    }
+</script>
+
+</body>
+</html>
